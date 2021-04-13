@@ -1,37 +1,66 @@
 #define BOOST_DATE_TIME_NO_LIB
 
 #include <iostream>
-#include <string>
 
-#include <boost/interprocess/allocators/allocator.hpp>
-#include <boost/interprocess/containers/string.hpp>
 #include <boost/interprocess/managed_shared_memory.hpp>
+#include <boost/container/scoped_allocator.hpp>
+#include <boost/interprocess/allocators/allocator.hpp>
+#include <boost/interprocess/containers/map.hpp>
+#include <boost/interprocess/containers/vector.hpp>
+#include <boost/interprocess/containers/string.hpp>
 
-int main(int argc, char ** argv)
+using namespace boost::interprocess;
+
+typedef managed_shared_memory::segment_manager segment_manager_t;
+typedef boost::container::scoped_allocator_adaptor<allocator<void, segment_manager_t> > void_allocator;
+typedef void_allocator::rebind<std::string>::other string_allocator;
+typedef vector<std::string, string_allocator> string_vector;
+
+
+class complex_data
 {
-	using allocator = boost::interprocess::allocator < char,
-		boost::interprocess::managed_shared_memory::segment_manager > ;
+public:
+    string_vector string_vector;
 
-	using string = boost::interprocess::basic_string < char,
-		std::char_traits < char >, allocator> ;
+    typedef void_allocator allocator_type;
 
-	const std::string shared_memory_name = "managed_shared_memory";
+    complex_data(complex_data const& other, const allocator_type& void_alloc)
+        : string_vector(other.string_vector, void_alloc)
+    {}
+    complex_data(const allocator_type& void_alloc)
+        : string_vector(void_alloc)
+    {}
 
-	boost::interprocess::shared_memory_object::remove(shared_memory_name.c_str());
+};
 
-	boost::interprocess::managed_shared_memory shared_memory(
-		boost::interprocess::open_or_create, shared_memory_name.c_str(), 1024);
+typedef void_allocator::rebind<complex_data>::other    complex_data_allocator;
+typedef vector<complex_data, complex_data_allocator>   complex_data_vector;
 
-	auto s = shared_memory.find_or_construct < string > ("String")("Hello",
-		shared_memory.get_segment_manager());
+int main()
+{
+    struct shared_memory_remove {
+        shared_memory_remove() { shared_memory_object::remove("MySharedMemory"); }
+        ~shared_memory_remove() { shared_memory_object::remove("MySharedMemory"); }
+    } remover;
 
-	*s += ", world!";
+    managed_shared_memory segment(open_or_create, "MySharedMemory", 65536);
+    void_allocator alloc_inst(segment.get_segment_manager());
+    complex_data* complex_data0_ = segment.construct<complex_data>("MyComplexData")(alloc_inst);
 
-	std::cout << *s << std::endl;
+    std::string message;
+    size_t counter = 0;
 
-	boost::interprocess::shared_memory_object::remove(shared_memory_name.c_str());
+    while (message != "end") {
+        std::cin >> message;
+        complex_data0_->string_vector.push_back(message);
+        counter++;
+    }
 
-	system("pause");
+    std::cout << std::endl;
 
-	return EXIT_SUCCESS;
+    for (size_t i = 0; i < counter - 1; i++) {
+        std::cout << complex_data0_->string_vector[i] << std::endl;
+    }
+
+    return EXIT_SUCCESS;
 }
