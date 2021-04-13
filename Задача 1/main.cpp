@@ -33,8 +33,8 @@ public:
 
 };
 
-typedef void_allocator::rebind<complex_data>::other    complex_data_allocator;
-typedef vector<complex_data, complex_data_allocator>   complex_data_vector;
+typedef void_allocator::rebind<complex_data>::other complex_data_allocator;
+typedef vector<complex_data, complex_data_allocator> complex_data_vector;
 
 int main()
 {
@@ -45,7 +45,7 @@ int main()
 
     managed_shared_memory segment(open_or_create, "MySharedMemory", 65536);
     void_allocator alloc_inst(segment.get_segment_manager());
-    complex_data* complex_data0_ = segment.construct<complex_data>("MyComplexData")(alloc_inst);
+    complex_data * complex_data0_ = segment.construct<complex_data>("MyComplexData")(alloc_inst);
 
     std::string message;
     size_t counter = 0;
